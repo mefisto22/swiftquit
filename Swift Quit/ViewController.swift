@@ -6,11 +6,9 @@
 //
 
 import Cocoa
-import LaunchAtLogin
+import UniformTypeIdentifiers
 
 class ViewController: NSViewController, NSTableViewDelegate, NSWindowDelegate {
-    @objc dynamic var launchAtLogin = LaunchAtLogin.kvo
-    
     @IBOutlet weak var launchHiddenSwitch: NSSwitch!
     @IBOutlet weak var displayMenubarIcon: NSSwitch!
     @IBOutlet weak var excludeBehaviourPopupOutlet: NSPopUpButton!
@@ -23,10 +21,15 @@ class ViewController: NSViewController, NSTableViewDelegate, NSWindowDelegate {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        NSApp.activate(ignoringOtherApps: true)
         view.window?.delegate = self
         
         setupViews()
+    }
+
+    override func viewWillAppear() {
+        super.viewWillAppear()
+        // Launch at login can also be changed in System Settings → General → Login Items.
+        launchAtLoginSwitch.state = SwiftQuit.isLaunchAtLoginEnabled() ? .on : .off
     }
     
     override var representedObject: Any? {
@@ -36,8 +39,7 @@ class ViewController: NSViewController, NSTableViewDelegate, NSWindowDelegate {
     }
     
     func setupViews() {
-        print("launch at login:")
-        print(launchAtLogin)
+        launchAtLoginSwitch.state = SwiftQuit.isLaunchAtLoginEnabled() ? .on : .off
 
         if(swiftQuitSettings["menubarIconEnabled"] == "true"){
             displayMenubarIcon.state = NSControl.StateValue.on
@@ -65,8 +67,8 @@ class ViewController: NSViewController, NSTableViewDelegate, NSWindowDelegate {
 
     @objc func closeDelayChanged(_ sender: NSTextField) {
         let value = sender.stringValue
-        // Validate that it's a positive number
-        if let intValue = Int(value), intValue > 0 {
+        // Validate that it's a non-negative number of seconds
+        if let intValue = Int(value), intValue >= 0 {
             SwiftQuit.setCloseDelay(value)
         } else {
             // Reset to previous value if invalid
@@ -76,16 +78,16 @@ class ViewController: NSViewController, NSTableViewDelegate, NSWindowDelegate {
     
     @IBAction func launchAtLoginToggle(_ sender: Any) {
         
-        if launchAtLoginSwitch.state == NSControl.StateValue.on {
-            SwiftQuit.enableLaunchAtLogin()
-            LaunchAtLogin.isEnabled = true
-
+        do {
+            try SwiftQuit.setLaunchAtLogin(launchAtLoginSwitch.state == NSControl.StateValue.on)
+        } catch {
+            let launchAtLoginAlert = NSAlert(error: error)
+            launchAtLoginAlert.messageText = "Couldn't Change Launch at Login"
+            if let window = self.view.window {
+                launchAtLoginAlert.beginSheetModal(for: window, completionHandler: nil)
+            }
         }
-        else{
-            SwiftQuit.disableLaunchAtLogin()
-            LaunchAtLogin.isEnabled = false
-
-        }
+        launchAtLoginSwitch.state = SwiftQuit.isLaunchAtLoginEnabled() ? .on : .off
         
     }
     
@@ -104,7 +106,9 @@ class ViewController: NSViewController, NSTableViewDelegate, NSWindowDelegate {
             disableMenubarAlert.informativeText = "If you need to access it, simply launch the app again to display the settings page."
             disableMenubarAlert.alertStyle = .informational
             disableMenubarAlert.addButton(withTitle: "OK")
-            disableMenubarAlert.beginSheetModal(for: self.view.window!, completionHandler: nil)
+            if let window = self.view.window {
+                disableMenubarAlert.beginSheetModal(for: window, completionHandler: nil)
+            }
 
         }
         
@@ -133,22 +137,20 @@ class ViewController: NSViewController, NSTableViewDelegate, NSWindowDelegate {
     
     @IBAction func addExcludedApp(_ sender: Any) {
         let dialog = NSOpenPanel();
-        let directory = URL(string: "file:///System/Applications/")
-        
         dialog.title                   = "Choose Application";
         dialog.showsResizeIndicator    = true;
         dialog.showsHiddenFiles        = false;
         dialog.canChooseFiles = true;
-        dialog.canChooseDirectories = true;
-        dialog.treatsFilePackagesAsDirectories = true
-        dialog.directoryURL = directory
+        dialog.canChooseDirectories = false;
+        dialog.allowedContentTypes = [.applicationBundle]
+        dialog.directoryURL = URL(fileURLWithPath: "/Applications", isDirectory: true)
         
         if (dialog.runModal() ==  NSApplication.ModalResponse.OK) {
             let result = dialog.url
             
-            if (result != nil) {
+            if let result, !swiftQuitExcludedApps.contains(result.path) {
                 
-                swiftQuitExcludedApps.append(result!.path)
+                swiftQuitExcludedApps.append(result.path)
                 
                 let count = swiftQuitExcludedApps.count - 1
                 let indexSet = IndexSet(integer:count)
