@@ -6,7 +6,7 @@ This is a maintained fork of [onebadidea/swiftquit](https://github.com/onebadide
 
 ## Download
 
-**[Download Swift Quit 1.6](https://github.com/mefisto22/swiftquit/releases/latest/download/Swift-Quit.zip)** — or see all versions on the [Releases page](https://github.com/mefisto22/swiftquit/releases).
+**[Download Swift Quit 1.6.1](https://github.com/mefisto22/swiftquit/releases/latest/download/Swift-Quit.zip)** — or see all versions on the [Releases page](https://github.com/mefisto22/swiftquit/releases).
 
 Requires macOS 13 Ventura or later. Runs natively on Apple silicon and Intel Macs.
 
@@ -42,6 +42,11 @@ macOS ties the Accessibility permission to the app's code signature. Builds that
 - **Launch hidden** and **Show menu bar icon.**
 
 Swift Quit never quits Finder, menu bar apps, or background agents. Apps with minimized windows, windows on other desktops (Spaces), or windows in full screen keep running.
+
+## What's New in 1.6.1
+
+- Apps that keep a closed window in their window list, such as Reminders, Calendar and Pages, are now quit when you close their last window. Before, they could stay open in the Dock with no window. Swift Quit now only counts windows that are on screen, minimized, or on another desktop.
+- If an app keeps running after you click its close button, the log says which windows Swift Quit still counted (see [Troubleshooting](#troubleshooting)).
 
 ## What's New in 1.6
 

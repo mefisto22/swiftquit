@@ -180,10 +180,28 @@ class SwiftQuit {
         log.notice("Close button clicked in \(app.localizedName ?? "<no_name>", privacy: .public)")
 
         DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(closeDelay())) {
-            pendingHiddenTerminations.remove(pid)
-
-            if app.isHidden && !app.isTerminated && canCloseApplication(app: app) {
+            guard !app.isTerminated, canCloseApplication(app: app) else {
+                pendingHiddenTerminations.remove(pid)
+                return
+            }
+            if app.isHidden {
+                pendingHiddenTerminations.remove(pid)
                 terminateApplication(app: app)
+                return
+            }
+            // Normally the window list shows the last window closing. If it
+            // doesn't, check once more and log what still counts as a window.
+            WindowMonitor.shared.hasWindows(processIdentifier: pid) { hasWindows in
+                pendingHiddenTerminations.remove(pid)
+                guard !app.isTerminated, !pendingTerminations.contains(pid) else { return }
+
+                if !hasWindows {
+                    terminateApplication(app: app)
+                    return
+                }
+                WindowMonitor.shared.describeWindows(processIdentifier: pid) { description in
+                    log.notice("\(app.localizedName ?? "<no_name>", privacy: .public) still has windows; not quitting. Windows: \(description, privacy: .public)")
+                }
             }
         }
     }
